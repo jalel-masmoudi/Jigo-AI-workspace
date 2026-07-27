@@ -12,39 +12,58 @@ const supabaseAnonKey =
 
 export const isSupabaseConfigured = Boolean(
   supabaseUrl &&
-  supabaseAnonKey &&
-  !supabaseUrl.includes("your-project") &&
-  !supabaseAnonKey.includes("your-anon-key"),
+    supabaseAnonKey &&
+    !supabaseUrl.includes("your-project") &&
+    !supabaseAnonKey.includes("your-anon-key"),
 );
 
+const url = isSupabaseConfigured ? supabaseUrl : "https://placeholder.supabase.co";
+const key = isSupabaseConfigured
+  ? supabaseAnonKey
+  : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder";
+
+/**
+ * Vite SSR on Node 20 has no native WebSocket, and `require("ws")` is unreliable
+ * inside the Vite module runner. A no-op transport is enough for SSR — realtime
+ * is only used in the browser.
+ */
+class SsrWebSocketStub {
+  static CONNECTING = 0;
+  static OPEN = 1;
+  static CLOSING = 2;
+  static CLOSED = 3;
+  readyState = SsrWebSocketStub.CLOSED;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  constructor(_url?: string | URL, _protocols?: string | string[]) {}
+  close() {}
+  send() {}
+  addEventListener() {}
+  removeEventListener() {}
+  dispatchEvent() {
+    return false;
+  }
+}
+
 function createSupabase(): SupabaseClient {
-  if (!isSupabaseConfigured) {
-    // Placeholder client — auth methods will fail; we use local auth instead.
-    return createClient(
-      "https://placeholder.supabase.co",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder",
-    );
+  if (typeof window === "undefined") {
+    return createClient(url, key, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+      realtime: { transport: SsrWebSocketStub as unknown as typeof WebSocket },
+    });
   }
 
-  const options =
-    typeof window === "undefined"
-      ? {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false,
-          },
-        }
-      : {
-          auth: {
-            persistSession: true,
-            autoRefreshToken: true,
-            detectSessionInUrl: true,
-            flowType: "pkce" as const,
-          },
-        };
-
-  return createClient(supabaseUrl, supabaseAnonKey, options);
+  return createClient(url, key, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: "pkce",
+    },
+  });
 }
 
 export const supabase = createSupabase();

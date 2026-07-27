@@ -25,6 +25,7 @@ interface AuthState {
 
 let readyPromise: Promise<void> | null = null;
 let resolveReady: (() => void) | null = null;
+let initialized = false;
 
 function ensureReadyGate() {
   if (!readyPromise) {
@@ -69,37 +70,47 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
   waitUntilReady: () => ensureReadyGate(),
   initialize: async () => {
+    if (initialized) {
+      markReady();
+      return;
+    }
+    initialized = true;
     ensureReadyGate();
-    if (typeof window === "undefined") {
-      set({ isLoading: false });
-      markReady();
-      return;
-    }
 
-    if (isSupabaseConfigured) {
-      const { data } = await supabase.auth.getSession();
-      if (data.session) {
-        get().setSession(data.session);
-      } else {
-        set({ session: null, user: null, mode: "supabase" });
+    try {
+      if (typeof window === "undefined") {
+        set({ isLoading: false });
+        return;
       }
+
+      if (isSupabaseConfigured) {
+        const { data } = await supabase.auth.getSession();
+        if (data.session) {
+          get().setSession(data.session);
+        } else {
+          set({ session: null, user: null, mode: "supabase" });
+        }
+        supabase.auth.onAuthStateChange((_event, session) => {
+          get().setSession(session);
+        });
+      } else {
+        set({
+          user: getLocalSession(),
+          session: null,
+          mode: "local",
+        });
+      }
+    } catch (err) {
+      console.error("Auth initialize failed, falling back to local mode", err);
+      set({
+        user: typeof window !== "undefined" ? getLocalSession() : null,
+        session: null,
+        mode: "local",
+      });
+    } finally {
       set({ isLoading: false });
       markReady();
-
-      supabase.auth.onAuthStateChange((_event, session) => {
-        get().setSession(session);
-      });
-      return;
     }
-
-    const local = getLocalSession();
-    set({
-      user: local,
-      session: null,
-      mode: "local",
-      isLoading: false,
-    });
-    markReady();
   },
   signIn: async (email, password) => {
     if (isSupabaseConfigured) {
@@ -130,7 +141,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         get().setSession(data.session);
         return {};
       }
-      // Email confirmation required
       return { needsEmailConfirmation: true };
     }
 
