@@ -12,9 +12,9 @@ const supabaseAnonKey =
 
 export const isSupabaseConfigured = Boolean(
   supabaseUrl &&
-    supabaseAnonKey &&
-    !supabaseUrl.includes("your-project") &&
-    !supabaseAnonKey.includes("your-anon-key"),
+  supabaseAnonKey &&
+  !supabaseUrl.includes("your-project") &&
+  !supabaseAnonKey.includes("your-anon-key"),
 );
 
 const url = isSupabaseConfigured ? supabaseUrl : "https://placeholder.supabase.co";
@@ -33,7 +33,6 @@ class SsrWebSocketStub {
   static CLOSING = 2;
   static CLOSED = 3;
   readyState = SsrWebSocketStub.CLOSED;
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   constructor(_url?: string | URL, _protocols?: string | string[]) {}
   close() {}
   send() {}
