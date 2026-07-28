@@ -45,5 +45,6 @@ Thumbs.db
 *.sw?
 
 # Local agent / tooling noise
+.worktrees/
 .lovable/
 graphify-out/
