@@ -1,5 +1,10 @@
-import { summarizeContent, remindersFromSummary } from "./summarize";
-import { getProvider, getProviderStatus, listProviders } from "./integrations/registry";
+﻿import { summarizeContent, remindersFromSummary } from "./summarize";
+import {
+  getProvider,
+  getProviderStatus,
+  isIntegrationProviderId,
+  listProviders,
+} from "./integrations/registry";
 import type { IntegrationProviderId } from "@/types/integrations";
 import type { IntegrationCredentials } from "./integrations/types";
 
@@ -51,6 +56,12 @@ export async function handleIntegrationAuthorizeRequest(request: Request): Promi
   if (!body.provider || !body.redirectUri) {
     return Response.json({ error: "provider and redirectUri are required" }, { status: 400 });
   }
+  if (!isIntegrationProviderId(body.provider)) {
+    return Response.json(
+      { error: `Unsupported provider "${String(body.provider)}".` },
+      { status: 400 },
+    );
+  }
   const provider = getProvider(body.provider);
   if (!provider.getAuthorizeUrl) {
     return Response.json(
@@ -95,7 +106,15 @@ export async function handleIntegrationOAuthCallbackRequest(request: Request): P
     );
   }
 
-  const providerId = state.split(":")[0] as IntegrationProviderId;
+  const providerId = state.split(":")[0];
+  if (!isIntegrationProviderId(providerId)) {
+    return Response.redirect(
+      origin +
+        "/integrations?oauth=error&message=" +
+        encodeURIComponent('Unsupported provider "' + providerId + '".'),
+      302,
+    );
+  }
   const provider = getProvider(providerId);
   if (!provider.exchangeCode) {
     return Response.redirect(
@@ -133,6 +152,12 @@ export async function handleIntegrationSyncRequest(request: Request): Promise<Re
     };
     if (!body.provider) {
       return Response.json({ error: "provider is required" }, { status: 400 });
+    }
+    if (!isIntegrationProviderId(body.provider)) {
+      return Response.json(
+        { error: `Unsupported provider "${String(body.provider)}".` },
+        { status: 400 },
+      );
     }
     const provider = getProvider(body.provider);
     const creds = body.credentials || {};

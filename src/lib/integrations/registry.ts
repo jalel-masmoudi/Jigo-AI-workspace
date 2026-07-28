@@ -1,4 +1,4 @@
-import type { IntegrationProviderId } from "@/types/integrations";
+﻿import type { IntegrationProviderId } from "@/types/integrations";
 import { googleMeetProvider, jiraProvider, notionProvider, slackProvider } from "./providers";
 import type { IntegrationProvider } from "./types";
 import { INTEGRATION_CATALOG } from "./types";
@@ -9,6 +9,10 @@ const providers: Record<IntegrationProviderId, IntegrationProvider> = {
   slack: slackProvider,
   jira: jiraProvider,
 };
+
+export function isIntegrationProviderId(id: unknown): id is IntegrationProviderId {
+  return typeof id === "string" && Object.prototype.hasOwnProperty.call(providers, id);
+}
 
 export function getProvider(id: IntegrationProviderId): IntegrationProvider {
   return providers[id];
