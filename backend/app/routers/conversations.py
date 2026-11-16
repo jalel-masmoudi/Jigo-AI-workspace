@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -89,12 +89,16 @@ def list_messages(
     conversation_id: uuid.UUID,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    limit: int = Depends(list_limit),
+    offset: int = Query(0, ge=0),
 ):
     conversation = _conversation(db, conversation_id, user)
     return db.scalars(
         select(Message)
         .where(Message.conversation_id == conversation.id)
         .order_by(Message.created_at.asc(), Message.id.asc())
+        .limit(limit)
+        .offset(offset)
     ).all()
 
 

@@ -114,6 +114,8 @@ Authenticated routes expect `Authorization: Bearer <token>` from `POST /auth/reg
 | GET, POST          | `/reminders`                    |
 | PATCH, DELETE      | `/reminders/{id}`               |
 
+`GET /conversations/{id}/messages` accepts `limit` (1–100, default 100) and `offset` (default 0).
+
 ### Run
 
 ```bash
