@@ -42,6 +42,7 @@ def get_current_user(
             creds.credentials,
             settings.jwt_secret,
             algorithms=[settings.jwt_algorithm],
+            options={"require": ["exp", "sub"]},
         )
         user_id = uuid.UUID(str(payload.get("sub")))
     except (InvalidTokenError, ValueError, TypeError):
