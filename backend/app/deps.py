@@ -61,7 +61,6 @@ def get_current_user(
     return user
 
 
-# ponytail: hard cap of 100 rows per list; keyset pagination if one user outgrows it.
 def list_limit(limit: int = Query(100, ge=1, le=100)) -> int:
     return limit
 
