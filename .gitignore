@@ -48,3 +48,9 @@ Thumbs.db
 .worktrees/
 .lovable/
 graphify-out/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/

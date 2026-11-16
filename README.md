@@ -88,6 +88,63 @@ Copy `.env.example` to `.env`. Never commit `.env`.
 
 Without Supabase keys, accounts are stored in the browser (local mode). Without integration keys, Connect/Sync shows clear errors instead of mock data.
 
+## Backend
+
+FastAPI service for the records the workspace already keeps in the browser: users, conversations, messages, documents, and reminders. Chat, summarization, and integration sync stay on the TanStack server. The frontend still uses its browser stores.
+
+| Piece      | Choice                         |
+| ---------- | ------------------------------ |
+| API        | FastAPI                        |
+| ORM        | SQLAlchemy 2                   |
+| Migrations | Alembic                        |
+| Database   | PostgreSQL via `DATABASE_URL`  |
+
+Authenticated routes expect `Authorization: Bearer <token>` from `POST /auth/register` or `POST /auth/login`.
+
+| Method             | Path                            |
+| ------------------ | ------------------------------- |
+| GET                | `/health`                       |
+| POST               | `/auth/register`, `/auth/login` |
+| GET                | `/auth/me`                      |
+| GET, POST          | `/conversations`                |
+| GET, PATCH, DELETE | `/conversations/{id}`           |
+| GET, POST          | `/conversations/{id}/messages`  |
+| GET, POST          | `/documents`                    |
+| GET, DELETE        | `/documents/{id}`               |
+| GET, POST          | `/reminders`                    |
+| PATCH, DELETE      | `/reminders/{id}`               |
+
+`GET /conversations/{id}/messages` accepts `limit` (1–100, default 100) and `offset` (default 0).
+
+### Run
+
+```bash
+docker compose up --build
+```
+
+The API listens on [http://localhost:8000](http://localhost:8000). `GET /health` checks Postgres.
+
+To run it without Compose, start Postgres, copy `backend/.env.example` to `backend/.env`, then:
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+### Test
+
+Pytest uses PostgreSQL. Point `DATABASE_URL` at a database whose name contains `test`. The CI job does this with a Postgres service and the database `jigo_test`. If `DATABASE_URL` is unset, pytest starts Postgres with testcontainers.
+
+```bash
+cd backend
+pip install -r requirements.txt -r requirements-dev.txt
+DATABASE_URL=postgresql+psycopg://jigo:jigo@127.0.0.1:5432/jigo_test JWT_SECRET=test-jwt-secret-please-change-me pytest
+```
+
 ## Project structure
 
 ```
@@ -97,6 +154,7 @@ src/
   routes/         # TanStack file-based routes
   store/          # Zustand stores
   types/          # Shared TypeScript types
+backend/          # FastAPI app, Alembic migrations, pytest
 public/           # Static assets (SVG favicon / mark)
 ```
 
