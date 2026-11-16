@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 def _strip_required(value: str) -> str:
@@ -137,6 +137,13 @@ class ReminderUpdate(BaseModel):
     due_at: UtcDateTime | None = None
     priority: Literal["low", "medium", "high"] | None = None
     completed: bool | None = None
+
+    @field_validator("title", "due_at", "priority", "completed")
+    @classmethod
+    def reject_null(cls, value):
+        if value is None:
+            raise ValueError("cannot be null")
+        return value
 
 
 class ReminderRead(BaseModel):
