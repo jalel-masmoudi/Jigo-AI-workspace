@@ -1,7 +1,10 @@
+import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import jwt
+import pytest
+from pydantic import ValidationError
 
 from tests.db_guard import assert_test_database
 
@@ -143,6 +146,24 @@ def test_conversations_and_messages_are_private(client):
 
     listed = client.get(f"/conversations/{conversation_id}/messages", headers=_auth(token_a))
     assert [item["role"] for item in listed.json()] == ["user", "assistant"]
+    page = client.get(
+        f"/conversations/{conversation_id}/messages",
+        params={"limit": 1, "offset": 1},
+        headers=_auth(token_a),
+    )
+    assert [item["content"] for item in page.json()] == ["hello"]
+    assert (
+        client.get(
+            f"/conversations/{conversation_id}/messages",
+            params={"offset": -1},
+            headers=_auth(token_a),
+        ).status_code
+        == 422
+    )
+    assert (
+        client.get(f"/conversations/{conversation_id}/messages", headers=_auth(token_b)).status_code
+        == 404
+    )
 
     updated = client.get(f"/conversations/{conversation_id}", headers=_auth(token_a))
     assert updated.json()["preview"] == "hello"
@@ -154,6 +175,14 @@ def test_conversations_and_messages_are_private(client):
     )
     assert renamed.status_code == 200
     assert renamed.json()["title"] == "Status update"
+    assert (
+        client.patch(
+            f"/conversations/{conversation_id}",
+            json={"title": None},
+            headers=_auth(token_a),
+        ).status_code
+        == 422
+    )
 
     bad_role = client.post(
         f"/conversations/{conversation_id}/messages",
@@ -228,7 +257,9 @@ def test_reminders_complete_snooze_and_delete(client):
     assert later.status_code == 201, later.text
     assert sooner.status_code == 201, sooner.text
     assert sooner.json()["completed"] is False
-    assert sooner.json()["due_at"].startswith("2026-12-01T09:00:00")
+    assert datetime.fromisoformat(sooner.json()["due_at"]) == datetime(
+        2026, 12, 1, 9, 0, tzinfo=timezone.utc
+    )
 
     listed = client.get("/reminders", headers=_auth(token))
     assert [item["title"] for item in listed.json()] == ["Review", "Send notes"]
@@ -243,13 +274,48 @@ def test_reminders_complete_snooze_and_delete(client):
     assert patched.status_code == 200, patched.text
     assert patched.json()["completed"] is True
     assert patched.json()["description"] is None
-    assert patched.json()["due_at"].startswith("2026-12-03")
+    assert datetime.fromisoformat(patched.json()["due_at"]) == datetime(
+        2026, 12, 3, tzinfo=timezone.utc
+    )
+    for payload in ({"title": None}, {"due_at": None}, {"priority": None}, {"completed": None}):
+        rejected = client.patch(f"/reminders/{reminder_id}", json=payload, headers=_auth(token))
+        assert rejected.status_code == 422, payload
+    assert (
+        client.patch(
+            f"/reminders/{reminder_id}",
+            json={"title": "stolen"},
+            headers=_auth(other),
+        ).status_code
+        == 404
+    )
+    assert client.get("/reminders", headers=_auth(token)).json()[-1]["title"] == "Send notes"
 
     bad = client.patch(f"/reminders/{reminder_id}", json={"priority": "urgent"}, headers=_auth(token))
     assert bad.status_code == 422
     assert client.delete(f"/reminders/{reminder_id}", headers=_auth(other)).status_code == 404
     assert client.delete(f"/reminders/{reminder_id}", headers=_auth(token)).status_code == 204
     assert client.get("/reminders", headers=_auth(token)).json()[0]["title"] == "Review"
+
+
+def test_rejects_token_missing_required_claims(client):
+    secret = os.environ["JWT_SECRET"]
+    no_exp = jwt.encode({"sub": str(uuid.uuid4())}, secret, algorithm="HS256")
+    no_sub = jwt.encode(
+        {"exp": datetime.now(timezone.utc) + timedelta(minutes=5)},
+        secret,
+        algorithm="HS256",
+    )
+    assert client.get("/auth/me", headers=_auth(no_exp)).status_code == 401
+    assert client.get("/auth/me", headers=_auth(no_sub)).status_code == 401
+
+
+def test_jwt_secret_must_be_at_least_32_bytes():
+    from app.config import Settings
+
+    kwargs = {"database_url": "postgresql+psycopg://127.0.0.1/jigo_test"}
+    Settings(**kwargs, jwt_secret="x" * 32)
+    with pytest.raises(ValidationError):
+        Settings(**kwargs, jwt_secret="x" * 31)
 
 
 def test_list_limit_is_bounded(client):
