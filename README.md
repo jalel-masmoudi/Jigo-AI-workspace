@@ -1,5 +1,7 @@
 # Jigo AI Workspace
 
+[![CI](https://github.com/jalel-masmoudi/Jigo-AI-workspace/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/jalel-masmoudi/Jigo-AI-workspace/actions/workflows/ci.yml)
+
 Open-source AI workspace for teams that live in Meet, Notion, Slack, Jira, and ERP systems.
 
 Jigo helps employees chat with workplace context, sync knowledge from connected apps, summarize content with AI, and turn action items into reminders — without shipping fake demo data.
